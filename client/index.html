@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventFlow Prime</title>
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        bg: '#030712', // Deepest blue/black
+                        surface: '#111827',
+                        surface_light: '#1f2937',
+                        primary: '#6366f1', // Indigo 500
+                        primary_glow: '#818cf8',
+                        accent: '#ec4899', // Pink 500
+                        success: '#10b981',
+                        error: '#ef4444',
+                        warning: '#f59e0b'
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'slide-in-right': 'slideInRight 0.3s ease-out',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        slideInRight: {
+                            '0%': { transform: 'translateX(100%)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .glass-input {
+            background: rgba(3, 7, 18, 0.6);
+            border: 1px solid rgba(75, 85, 99, 0.4);
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .glass-input:focus {
+            border-color: theme('colors.primary');
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+            outline: none;
+        }
+
+        /* Neon Glows */
+        .neon-text {
+            text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        }
+
+        .neon-border {
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+        }
+
+        #canvas-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body class="bg-bg text-gray-100 min-h-screen flex flex-col">
+
+    <!-- Background Animation -->
+    <canvas id="canvas-bg"></canvas>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Main Container -->
+    <div id="app" class="relative z-10 container mx-auto px-4 py-8 flex-grow flex flex-col">
+
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8 animate-fade-in">
+            <div class="flex items-center gap-3">
+                <div
+                    class="relative w-10 h-10 flex items-center justify-center bg-primary/20 rounded-lg border border-primary/30 neon-border">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight font-sans">EventFlow <span
+                            class="text-primary neon-text">Prime</span></h1>
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <span class="text-xs text-gray-400 font-mono uppercase tracking-wider">System Operational</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="user-controls" class="hidden flex items-center gap-4">
+                <div class="text-right">
+                    <div id="user-email" class="text-sm font-medium text-white"></div>
+                    <div class="text-xs text-gray-500 font-mono">Role: User</div>
+                </div>
+                <button onclick="logout()"
+                    class="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Auth View -->
+        <div id="auth-view" class="flex-grow flex items-center justify-center">
+            <div class="glass-panel w-full max-w-md p-8 rounded-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary"></div>
+                <h2 class="text-2xl font-bold mb-6 text-center">Access Console</h2>
+
+                <div class="space-y-6">
+                    <div class="flex bg-surface_light/50 p-1 rounded-lg">
+                        <button onclick="switchAuth('login')" id="tab-login"
+                            class="flex-1 py-2 text-sm font-medium rounded-md bg-primary text-white shadow-lg transition-all">Login</button>
+                        <button onclick="switchAuth('register')" id="tab-register"
+                            class="flex-1 py-2 text-sm font-medium rounded-md text-gray-400 hover:text-white transition-all">Register</button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-mono text-gray-400 mb-1">EMAIL ADDRESS</label>
+                            <input type="email" id="auth-email" class="glass-input w-full p-3 rounded-lg"
+                                placeholder="dev@eventflow.io">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-mono text-gray-400 mb-1">PASSWORD</label>
+                            <input type="password" id="auth-password" class="glass-input w-full p-3 rounded-lg"
+                                placeholder="••••••••">
+                        </div>
+                        <button onclick="handleAuth()" id="auth-btn"
+                            class="w-full py-3 bg-primary hover:bg-primary_glow text-white font-bold rounded-lg shadow-lg shadow-primary/20 transition-all transform hover:-translate-y-0.5">
+                            Authenticate
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="hidden space-y-8 animate-slide-up">
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Stat 1 -->
+                <div
+                    class="glass-panel p-6 rounded-xl flex items-center justify-between group hover:border-primary/50 transition-colors">
+                    <div>
+                        <p class="text-gray-400 text-xs font-mono uppercase">Total Events</p>
+                        <h3 id="stat-total" class="text-3xl font-bold mt-1 group-hover:text-primary transition-colors">0
+                        </h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                </div>
+                <!-- Stat 2 -->
+                <div
+                    class="glass-panel p-6 rounded-xl flex items-center justify-between group hover:border-green-500/50 transition-colors">
+                    <div>
+                        <p class="text-gray-400 text-xs font-mono uppercase">Success Rate</p>
+                        <h3 id="stat-success"
+                            class="text-3xl font-bold mt-1 group-hover:text-green-400 transition-colors">100%</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+                <!-- Stat 3 -->
+                <div
+                    class="glass-panel p-6 rounded-xl flex items-center justify-between group hover:border-purple-500/50 transition-colors">
+                    <div>
+                        <p class="text-gray-400 text-xs font-mono uppercase">Processing Time</p>
+                        <h3 class="text-3xl font-bold mt-1 group-hover:text-purple-400 transition-colors">~ms</h3>
+                    </div>
+                    <div
+                        class="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                <!-- Dispatcher -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="glass-panel rounded-2xl p-1 relative overflow-hidden">
+                        <div class="bg-surface p-6 rounded-xl h-full">
+                            <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                                <span class="w-2 h-6 bg-accent rounded-sm"></span>
+                                Dispatcher
+                            </h3>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-mono text-gray-400 mb-1">EVENT TYPE</label>
+                                    <select id="event-type" class="glass-input w-full p-3 rounded-lg cursor-pointer">
+                                        <option value="ORDER_CREATED">ORDER_CREATED</option>
+                                        <option value="PAYMENT_PROCESSED">PAYMENT_PROCESSED</option>
+                                        <option value="USER_SIGNUP">USER_SIGNUP</option>
+                                        <option value="SYSTEM_ALERT">SYSTEM_ALERT</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-mono text-gray-400 mb-1">JSON PAYLOAD</label>
+                                    <div class="relative">
+                                        <textarea id="event-payload" rows="8"
+                                            class="glass-input w-full p-3 rounded-lg font-mono text-xs text-blue-300 leading-relaxed resize-none">
+{
+  "orderId": "ord_123456",
+  "amount": 2499.00,
+  "currency": "USD",
+  "items": [
+    "premium_plan",
+    "addon_pack"
+  ]
+}</textarea>
+                                        <div class="absolute bottom-3 right-3 text-xs text-gray-600 font-mono">JSON
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button onclick="dispatchClick()"
+                                    class="w-full py-4 bg-gradient-to-r from-primary to-blue-600 hover:from-primary_glow hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                                    <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Inject Event
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feed -->
+                <div class="lg:col-span-8">
+                    <div class="glass-panel rounded-2xl h-[600px] flex flex-col overflow-hidden">
+                        <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-surface/50">
+                            <h3 class="font-bold flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                Live Stream
+                            </h3>
+                            <div class="flex items-center gap-2 text-xs text-gray-400 font-mono">
+                                <span class="w-2 h-2 rounded-full bg-gray-600 animate-ping"></span>
+                                POLLING
+                            </div>
+                        </div>
+
+                        <div id="events-feed" class="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            <!-- Event Cards go here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Logic -->
+    <script>
+        // --- CONSTANTS ---
+        const API_URL = 'http://localhost:3000/api/v1';
+
+        // --- STATE ---
+        let state = {
+            token: localStorage.getItem('token'),
+            user: localStorage.getItem('user_email'),
+            authMode: 'login', // or 'register'
+            events: []
+        };
+
+        // --- UI UTILS ---
+        const $ = (id) => document.getElementById(id);
+
+        function showToast(msg, type = 'info') {
+            const container = $('toast-container');
+            const toast = document.createElement('div');
+
+            let colors = type === 'error' ? 'border-red-500 text-red-100 bg-red-900/80' :
+                type === 'success' ? 'border-green-500 text-green-100 bg-green-900/80' :
+                    'border-blue-500 text-blue-100 bg-blue-900/80';
+
+            toast.className = `glass-panel border-l-4 ${colors} px-6 py-4 rounded-lg shadow-xl animate-slide-in-right flex items-center gap-3 backdrop-blur-md min-w-[300px]`;
+            toast.innerHTML = `
+                <span class="font-medium">${msg}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function switchAuth(mode) {
+            state.authMode = mode;
+            $('tab-login').className = mode === 'login' ? 'flex-1 py-2 text-sm font-medium rounded-md bg-primary text-white shadow-lg transition-all' : 'flex-1 py-2 text-sm font-medium rounded-md text-gray-400 hover:text-white transition-all';
+            $('tab-register').className = mode === 'register' ? 'flex-1 py-2 text-sm font-medium rounded-md bg-accent text-white shadow-lg transition-all' : 'flex-1 py-2 text-sm font-medium rounded-md text-gray-400 hover:text-white transition-all';
+            $('auth-btn').textContent = mode === 'login' ? 'Login to Console' : 'Create Account';
+            $('auth-btn').className = `w-full py-3 ${mode === 'login' ? 'bg-primary hover:bg-primary_glow' : 'bg-accent hover:bg-pink-400'} text-white font-bold rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5`;
+        }
+
+        // --- APP LOGIC ---
+        function init() {
+            if (state.token) {
+                showDashboard();
+            } else {
+                showAuth();
+            }
+            initCanvas();
+        }
+
+        function showAuth() {
+            $('auth-view').classList.remove('hidden');
+            $('dashboard-view').classList.add('hidden');
+            $('user-controls').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            $('auth-view').classList.add('hidden');
+            $('dashboard-view').classList.remove('hidden');
+            $('user-controls').classList.remove('hidden');
+            $('user-email').textContent = state.user;
+            fetchEvents();
+            setInterval(fetchEvents, 3000); // Poll
+        }
+
+        async function handleAuth() {
+            const email = $('auth-email').value;
+            const password = $('auth-password').value;
+            if (!email || !password) return showToast('Please fill all fields', 'error');
+
+            const endpoint = state.authMode === 'login' ? '/auth/login' : '/auth/register';
+            try {
+                const res = await fetch(API_URL + endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.message || 'Auth failed');
+
+                if (state.authMode === 'register') {
+                    showToast('Account created! Please login.', 'success');
+                    switchAuth('login');
+                } else {
+                    state.token = data.token;
+                    state.user = email;
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user_email', email);
+                    showToast('Welcome back, Command.', 'success');
+                    showDashboard();
+                }
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        async function dispatchClick() {
+            const type = $('event-type').value;
+            let payload;
+            try {
+                payload = JSON.parse($('event-payload').value);
+            } catch (e) {
+                return showToast('Invalid JSON Payload', 'error');
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/events`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${state.token}`
+                    },
+                    body: JSON.stringify({ type, payload })
+                });
+
+                if (res.ok) {
+                    showToast(`Event ${type} injected`, 'success');
+                    // Add slight random variation to payload amount for realism
+                    if (payload.amount) {
+                        const newAmount = (Math.random() * 5000).toFixed(2);
+                        $('event-payload').value = $('event-payload').value.replace(payload.amount, newAmount);
+                    }
+                    setTimeout(fetchEvents, 200);
+                } else {
+                    showToast('Injection failed', 'error');
+                }
+            } catch (e) { showToast('Network error', 'error'); }
+        }
+
+        async function fetchEvents() {
+            if (!state.token) return;
+            try {
+                const res = await fetch(`${API_URL}/events?limit=50`, {
+                    headers: { 'Authorization': `Bearer ${state.token}` }
+                });
+                const data = await res.json();
+
+                if (data.data) {
+                    renderEvents(data.data);
+                    updateStats(data.data);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function updateStats(events) {
+            $('stat-total').textContent = events.length;
+            const success = events.filter(e => e.status === 'COMPLETED').length;
+            const rate = events.length > 0 ? Math.round((success / events.length) * 100) : 100;
+            $('stat-success').textContent = `${rate}%`;
+        }
+
+        function renderEvents(events) {
+            const feed = $('events-feed');
+
+            // Just basic diffing to avoid full re-render flickering
+            // In a real app we'd use React/Vue
+            const html = events.map(event => {
+                const statusColor = event.status === 'COMPLETED' ? 'text-green-400 border-green-500/30 bg-green-500/5' :
+                    event.status === 'FAILED' ? 'text-red-400 border-red-500/30 bg-red-500/5' :
+                        'text-blue-400 border-blue-500/30 bg-blue-500/5';
+
+                return `
+                <div class="group relative overflow-hidden rounded-lg border ${statusColor.split(' ')[1]} ${statusColor.split(' ')[2]} p-4 transition-all hover:scale-[1.01]">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-3">
+                            <span class="font-mono text-sm font-bold ${statusColor.split(' ')[0]}">${event.type}</span>
+                            <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface border border-white/10 text-gray-400">${event.status}</span>
+                        </div>
+                        <span class="text-xs font-mono text-gray-500">${new Date(event.created_at).toLocaleTimeString()}</span>
+                    </div>
+                    <div class="bg-black/30 rounded p-2 overflow-x-auto">
+                        <pre class="font-mono text-xs text-gray-300">${JSON.stringify(event.payload, null, 0)}</pre>
+                    </div>
+                    <!-- Hover Effect -->
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none"></div>
+                </div>
+                `;
+            }).join('');
+
+            if (feed.innerHTML !== html) {
+                feed.innerHTML = html;
+            }
+        }
+
+        // --- VISUALS ---
+        function initCanvas() {
+            const canvas = document.getElementById('canvas-bg');
+            const ctx = canvas.getContext('2d');
+            let width, height;
+            let particles = [];
+
+            function resize() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * width;
+                    this.y = Math.random() * height;
+                    this.vx = (Math.random() - 0.5) * 0.5;
+                    this.vy = (Math.random() - 0.5) * 0.5;
+                    this.size = Math.random() * 2;
+                    this.color = Math.random() > 0.5 ? 'rgba(99, 102, 241, ' : 'rgba(236, 72, 153, '; // Indigo or Pink
+                    this.alpha = Math.random() * 0.5;
+                }
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.x < 0) this.x = width;
+                    if (this.x > width) this.x = 0;
+                    if (this.y < 0) this.y = height;
+                    if (this.y > height) this.y = 0;
+                }
+                draw() {
+                    ctx.fillStyle = this.color + this.alpha + ')';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            for (let i = 0; i < 50; i++) particles.push(new Particle());
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+                particles.forEach(p => {
+                    p.update();
+                    p.draw();
+                });
+                // Connect particles
+                particles.forEach((p1, i) => {
+                    particles.slice(i + 1).forEach(p2 => {
+                        const dx = p1.x - p2.x;
+                        const dy = p1.y - p2.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 150) {
+                            ctx.strokeStyle = `rgba(255,255,255,${0.1 - dist / 1500})`;
+                            ctx.beginPath();
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
+                        }
+                    });
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

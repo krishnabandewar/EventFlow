@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: eventflow-api
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://admin:password@postgres:5432/eventflow
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=supersecret
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - eventflow-network
+    command: npm start
+
+  worker:
+    build: .
+    container_name: eventflow-worker
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://admin:password@postgres:5432/eventflow
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - eventflow-network
+    command: npm run worker
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: eventflow-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: eventflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - eventflow-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: eventflow-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - eventflow-network
+
+networks:
+  eventflow-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
